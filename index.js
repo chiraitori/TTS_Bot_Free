@@ -604,6 +604,10 @@ client.on(Events.MessageCreate, async (message) => {
         // If user isn't in a voice channel or not in the same channel as the bot, skip
         if (!voiceChannel || voiceChannel.id !== connection.joinConfig.channelId) return;
         
+        // Check if the message is from the same channel as the voice channel
+        // Only read messages from the text channel that corresponds to the voice channel the bot is in
+        if (message.channel.id !== voiceChannel.id) return;
+        
         // Process message text to handle links and mentions
         const textToSpeak = processMessageText(message);
         
