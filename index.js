@@ -15,6 +15,41 @@ const path = require('path');
 const googleTTS = require('google-tts-api');
 const { promisify } = require('util');
 const { Readable } = require('stream');
+const mongoose = require('mongoose');
+
+// Import database models
+const ServerSettings = require('./models/ServerSettings');
+
+// Connect to MongoDB
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/tts_bot', {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+}).then(() => {
+    console.log('Connected to MongoDB');
+}).catch(err => {
+    console.error('MongoDB connection error:', err);
+    console.log('Continuing without database connection - using default settings');
+});
+
+// Function to get server settings with defaults
+async function getServerSettings(guildId) {
+    try {
+        let settings = await ServerSettings.findOne({ guildId });
+        if (!settings) {
+            // Create default settings if none exist
+            settings = await ServerSettings.create({ guildId });
+        }
+        return settings;
+    } catch (error) {
+        console.error('Error fetching server settings:', error);
+        // Return default settings if database error occurs
+        return {
+            language: 'en',
+            disableUsernames: false,
+            disableJoinLeaveMessages: false
+        };
+    }
+}
 
 // Function to check disk space and clean temp folder if needed
 async function checkAndCleanupDiskSpace() {
@@ -212,11 +247,8 @@ function safeDeleteFile(filePath) {
 }
 
 // Function to process TTS for a chunk and return a promise
-async function processTTSChunk(text, tmpDir) {
+async function processTTSChunk(text, tmpDir, langCode = 'en') {
     try {
-        // Get the language code from environment or default to English
-        const langCode = process.env.DEFAULT_LANG || 'en';
-        
         // Get the audio URL from Google TTS API
         const audioURL = googleTTS.getAudioUrl(text, {
             lang: langCode,
@@ -228,40 +260,10 @@ async function processTTSChunk(text, tmpDir) {
         const audioResponse = await fetch(audioURL);
         const audioBuffer = await audioResponse.buffer();
         
-        // Check if we have enough disk space (at least 50MB free)
-        // If disk space is critically low, use in-memory mode
-        try {
-            const stats = fs.statfsSync(tmpDir);
-            const freeSpace = stats.bfree * stats.bsize;
-            const inMemoryMode = freeSpace < 50 * 1024 * 1024; // 50MB threshold
-            
-            if (inMemoryMode) {
-                // In memory mode - don't save to disk
-                return {
-                    buffer: audioBuffer,
-                    inMemory: true
-                };
-            }
-        } catch (diskError) {
-            console.log('Could not check disk space, defaulting to in-memory mode');
-            return {
-                buffer: audioBuffer,
-                inMemory: true
-            };
-        }
-        
-        // Normal disk mode - generate a unique filename for this chunk
-        const filename = path.join(tmpDir, `tts_${Date.now()}_${Math.floor(Math.random() * 1000)}.mp3`);
-        
-        // Save the audio file locally
-        fs.writeFileSync(filename, audioBuffer);
-        
-        // Add to tracking set
-        activeAudioFiles.add(filename);
-        
+        // Always use in-memory mode to avoid file system operations
         return {
-            path: filename,
-            inMemory: false
+            buffer: audioBuffer,
+            inMemory: true
         };
     } catch (error) {
         console.error('Error processing TTS chunk:', error);
@@ -270,7 +272,7 @@ async function processTTSChunk(text, tmpDir) {
 }
 
 // Add the TTS processing function to the client for use in commands
-client.processTTS = async function(text, guildId, fromQueue = false) {
+client.processTTS = async function(text, guildId, fromQueue = false, langCode = 'en') {
     // Create temporary directory if it doesn't exist
     const tmpDir = path.join(__dirname, 'temp');
     if (!fs.existsSync(tmpDir)){
@@ -285,7 +287,7 @@ client.processTTS = async function(text, guildId, fromQueue = false) {
     
     // Process all chunks and get their audio data
     for (const chunk of chunks) {
-        const result = await processTTSChunk(chunk, tmpDir);
+        const result = await processTTSChunk(chunk, tmpDir, langCode);
         if (result) {
             audioChunks.push(result);
         }
@@ -414,7 +416,6 @@ client.processTTS = async function(text, guildId, fromQueue = false) {
 };
 
 // Process the next message in the queue for a specific guild
-
 client.processMessageQueue = async function(guildId) {
     // Check if we're already processing this guild's queue
     if (client.isProcessingQueue.get(guildId)) {
@@ -434,11 +435,22 @@ client.processMessageQueue = async function(guildId) {
         // Get the next message from the queue
         const messageData = messageQueue.shift();
         
-        // Format the text to include username if requested
+        // Get server settings from database
+        const serverSettings = await getServerSettings(guildId);
+        
+        // Format the text to include username if requested and not disabled in server settings
         let textToSpeak = messageData.text;
-        if (messageData.includeUsername && messageData.username) {
-            // Add a pause after the username for better separation
-            textToSpeak = `${messageData.username}, says. ${textToSpeak}`;
+        
+        // Only add username if:
+        // 1. The message data indicates it should include username
+        // 2. Server settings don't disable usernames
+        // 3. A username actually exists
+        // 4. It's not a system message (to avoid "System says...")
+        if (messageData.includeUsername && 
+            !serverSettings.disableUsernames && 
+            messageData.username && 
+            messageData.username !== "System") {
+            textToSpeak = `${messageData.username}, ${textToSpeak}`;
         }
         
         // Create a promise that resolves when audio finishes playing
@@ -453,8 +465,11 @@ client.processMessageQueue = async function(guildId) {
             player.once('queue:complete', completeHandler);
         });
         
+        // Get the language from server settings
+        const langCode = serverSettings.language || 'en';
+        
         // Process the TTS - this will handle the audio playback
-        await client.processTTS(textToSpeak, guildId, true);
+        await client.processTTS(textToSpeak, guildId, true, langCode);
         
         // Wait for playback to finish
         await playbackPromise;
@@ -625,6 +640,47 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
     
     // Ignore other bot voice state changes
     if (oldState.member.user.bot || newState.member.user.bot) return;
+    
+    // Get guild ID for server settings
+    const guildId = newState.guild?.id || oldState.guild?.id;
+    if (!guildId) return;
+    
+    // Fetch server settings
+    const serverSettings = await getServerSettings(guildId);
+    
+    // Skip join/leave announcements if disabled in settings
+    if (serverSettings.disableJoinLeaveMessages) {
+        // Still track users in voice channels, but don't announce
+        if (newState.channel) {
+            const connection = client.connections.get(guildId);
+            if (connection && connection.joinConfig.channelId === newState.channelId) {
+                const guildUsers = client.voiceUsers.get(guildId) || new Map();
+                guildUsers.set(newState.member.id, newState.member.user.username);
+                client.voiceUsers.set(guildId, guildUsers);
+            }
+        }
+        
+        if (oldState.channel) {
+            const connection = client.connections.get(guildId);
+            if (connection && connection.joinConfig.channelId === oldState.channelId) {
+                const guildUsers = client.voiceUsers.get(guildId);
+                if (guildUsers) {
+                    guildUsers.delete(oldState.member.id);
+                }
+                
+                // If no users left in the channel (except bots), leave the channel
+                const nonBotMembers = oldState.channel.members.filter(member => !member.user.bot);
+                if (nonBotMembers.size === 0) {
+                    connection.destroy();
+                    client.connections.delete(guildId);
+                    client.voiceUsers.delete(guildId);
+                    client.messageQueues.delete(guildId);
+                    client.isProcessingQueue.delete(guildId);
+                }
+            }
+        }
+        return;
+    }
     
     // Handle user joining a voice channel where the bot is present
     if (newState.channel) {
