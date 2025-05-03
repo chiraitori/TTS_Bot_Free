@@ -534,6 +534,38 @@ client.joinVoiceChannel = function(voiceChannel, guildId) {
     return connection;
 };
 
+// Function to process message text - replace links with "a link" and mentions with @username
+function processMessageText(message) {
+    let text = message.content;
+    
+    // Replace URLs with "a link"
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    text = text.replace(urlRegex, "a link");
+    
+    // Replace Discord mentions with @username
+    message.mentions.users.forEach(user => {
+        const mention = `<@${user.id}>`;
+        const replacement = `@${user.username}`;
+        text = text.replace(mention, replacement);
+    });
+    
+    // Replace role mentions
+    message.mentions.roles.forEach(role => {
+        const mention = `<@&${role.id}>`;
+        const replacement = `@${role.name}`;
+        text = text.replace(mention, replacement);
+    });
+    
+    // Replace channel mentions
+    message.mentions.channels.forEach(channel => {
+        const mention = `<#${channel.id}>`;
+        const replacement = `#${channel.name}`;
+        text = text.replace(mention, replacement);
+    });
+    
+    return text;
+}
+
 // When the client is ready, register slash commands
 client.once(Events.ClientReady, async () => {
     console.log(`Logged in as ${client.user.tag}!`);
@@ -572,8 +604,8 @@ client.on(Events.MessageCreate, async (message) => {
         // If user isn't in a voice channel or not in the same channel as the bot, skip
         if (!voiceChannel || voiceChannel.id !== connection.joinConfig.channelId) return;
         
-        // Get the content to speak
-        const textToSpeak = message.content;
+        // Process message text to handle links and mentions
+        const textToSpeak = processMessageText(message);
         
         // Skip empty messages
         if (!textToSpeak) return;
@@ -609,29 +641,7 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
         const channelId = oldState.channel.id;
         const guildId = oldState.guild.id;
         
-        // Find a text channel to send the notification
-        try {
-            // Try to find the general channel first
-            let textChannel = oldState.guild.channels.cache.find(
-                channel => channel.type === 0 && // 0 is text channel
-                (channel.name.includes('general') || channel.name.includes('chat'))
-            );
-            
-            // If no general channel found, use the system channel or the first text channel
-            if (!textChannel) {
-                textChannel = oldState.guild.systemChannel || 
-                              oldState.guild.channels.cache.find(channel => channel.type === 0);
-            }
-            
-            // Send message if we found a text channel
-            if (textChannel) {
-                textChannel.send(`I was kicked from the voice channel by a user.`);
-            }
-        } catch (error) {
-            console.error('Failed to send kick notification:', error);
-        }
-        
-        // Clean up
+        // Clean up resources when bot is kicked - no notification needed
         client.connections.delete(guildId);
         client.voiceUsers.delete(guildId);
         client.messageQueues.delete(guildId); // Clear message queue when disconnected

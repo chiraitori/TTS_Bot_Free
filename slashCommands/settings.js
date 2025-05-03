@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const ServerSettings = require('../models/ServerSettings');
 
 module.exports = {
@@ -32,7 +32,7 @@ module.exports = {
     
     async execute(interaction, client) {
         // Check if user has permissions to manage server
-        if (!interaction.member.permissions.has('MANAGE_GUILD')) {
+        if (!interaction.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
             return interaction.reply({
                 content: 'You need the "Manage Server" permission to change these settings.',
                 ephemeral: true
