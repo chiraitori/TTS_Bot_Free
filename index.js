@@ -534,6 +534,33 @@ client.joinVoiceChannel = function(voiceChannel, guildId) {
     return connection;
 };
 
+// Function to check if the bot is alone in a voice channel and leave if so
+client.checkAndLeaveEmptyChannel = function(channel, guildId) {
+    if (!channel) return false;
+    
+    // Count non-bot members in the voice channel
+    const nonBotMembers = channel.members.filter(member => !member.user.bot);
+    
+    // If there are no human users left (only bots including our bot)
+    if (nonBotMembers.size === 0) {
+        console.log(`Leaving empty voice channel in guild ${guildId}: No human users left`);
+        
+        // Get the connection for this guild
+        const connection = client.connections.get(guildId);
+        if (connection) {
+            // Destroy the connection and clean up resources
+            connection.destroy();
+            client.connections.delete(guildId);
+            client.voiceUsers.delete(guildId);
+            client.messageQueues.delete(guildId);
+            client.isProcessingQueue.delete(guildId);
+            return true; // Successfully left channel
+        }
+    }
+    
+    return false; // Didn't need to leave channel
+};
+
 // Function to process message text - replace links with "a link" and mentions with @username
 function processMessageText(message) {
     let text = message.content;
@@ -682,15 +709,8 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
                     guildUsers.delete(oldState.member.id);
                 }
                 
-                // If no users left in the channel (except bots), leave the channel
-                const nonBotMembers = oldState.channel.members.filter(member => !member.user.bot);
-                if (nonBotMembers.size === 0) {
-                    connection.destroy();
-                    client.connections.delete(guildId);
-                    client.voiceUsers.delete(guildId);
-                    client.messageQueues.delete(guildId);
-                    client.isProcessingQueue.delete(guildId);
-                }
+                // Check if the bot should leave the channel using the dedicated function
+                client.checkAndLeaveEmptyChannel(oldState.channel, guildId);
             }
         }
         return;
@@ -757,16 +777,9 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
                     // Start processing the queue
                     client.processMessageQueue(oldState.guild.id);
                 }
-            }
-            
-            // If no users left in the channel (except bots), leave the channel
-            const nonBotMembers = oldState.channel.members.filter(member => !member.user.bot);
-            if (nonBotMembers.size === 0) {
-                connection.destroy();
-                client.connections.delete(oldState.guild.id);
-                client.voiceUsers.delete(oldState.guild.id);
-                client.messageQueues.delete(oldState.guild.id);
-                client.isProcessingQueue.delete(oldState.guild.id);
+                
+                // Check if the bot should leave the channel using the dedicated function
+                client.checkAndLeaveEmptyChannel(oldState.channel, oldState.guild.id);
             }
         }
     }
