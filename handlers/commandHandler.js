@@ -30,13 +30,9 @@ module.exports = async (client) => {
     const rest = new REST().setToken(process.env.DISCORD_TOKEN);
 
     try {
-        console.log('Started checking guild-specific application (/) commands...');
-        
         // Function to check existing commands and only update if needed
         async function updateCommands(guild) {
             try {
-                console.log(`Checking commands for guild: ${guild.name} (${guild.id})...`);
-                
                 // Fetch existing commands for this guild
                 const existingCommands = await rest.get(
                     Routes.applicationGuildCommands(client.user.id, guild.id)
@@ -63,18 +59,15 @@ module.exports = async (client) => {
                     }
                     
                     if (!needsUpdate) {
-                        console.log(`Commands already up to date for guild: ${guild.name}`);
                         return;
                     }
                 }
                 
                 // If we got here, we need to update the commands
-                console.log(`Updating commands for guild: ${guild.name}...`);
                 await rest.put(
                     Routes.applicationGuildCommands(client.user.id, guild.id),
                     { body: commands }
                 );
-                console.log(`Successfully deployed commands for guild: ${guild.name}`);
                 
             } catch (error) {
                 console.error(`Error managing commands for guild ${guild.name}:`, error);
@@ -86,7 +79,6 @@ module.exports = async (client) => {
             for (const guild of client.guilds.cache.values()) {
                 await updateCommands(guild);
             }
-            console.log('Guild command registration complete!');
         } else {
             console.log('Bot is not in any guilds yet. Commands will be registered when joining new guilds.');
         }

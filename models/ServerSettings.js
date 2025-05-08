@@ -17,6 +17,14 @@ const ServerSettingsSchema = new mongoose.Schema({
     disableJoinLeaveMessages: {
         type: Boolean,
         default: true // By default, join/leave messages are announced
+    },
+    enableTranslation: {
+        type: Boolean,
+        default: false // By default, translation is disabled
+    },
+    forceServerLanguage: {
+        type: Boolean,
+        default: false // By default, respect user language preferences
     }
 });
 

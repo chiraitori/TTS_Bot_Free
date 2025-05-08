@@ -1,3 +1,51 @@
+# Environment variables
 .env
-node_modules
-dist
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+
+# Output directories
+dist/
+build/
+coverage/
+tmp/
+temp/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor directories and files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+
+# Debug files
+.nyc_output/
+
+# Project specific
+fix_bot/
+temp/audio-*.mp3
+temp/speech-*.mp3
+
+# Misc
+.cache/
+.npm/
+.yarn/
