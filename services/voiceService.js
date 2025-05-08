@@ -83,10 +83,6 @@ function connectToVoiceChannel(voiceChannel, guildId, client) {
  * @returns {boolean} - True if left, false otherwise
  */
 function checkAndLeaveEmptyChannel(channel, guildId, client) {
-    // Disabled automatic leaving - bot will stay in channels indefinitely
-    return false;
-    
-    /* Original functionality - commented out
     if (!channel) return false;
     
     // Count non-bot members in the voice channel
@@ -110,7 +106,6 @@ function checkAndLeaveEmptyChannel(channel, guildId, client) {
     }
     
     return false; // Didn't need to leave channel
-    */
 }
 
 module.exports = {

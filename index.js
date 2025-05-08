@@ -15,6 +15,7 @@ const { processTTS } = require('./services/ttsService');
 const voiceService = require('./services/voiceService');
 const { processMessageQueue, enqueueMessage, enqueueSystemMessage } = require('./services/queueService');
 const { getText } = require('./utils/languageManager');
+const { startKeepAliveSystem } = require('./utils/keepAlive');
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/tts_bot')
@@ -91,6 +92,9 @@ client.once(Events.ClientReady, async () => {
     
     // Schedule regular cleanup checks
     setInterval(checkAndCleanupDiskSpace, 30 * 60 * 1000); // Check every 30 minutes
+    
+    // Start the keep-alive system to prevent Discord from disconnecting due to inactivity
+    startKeepAliveSystem(client);
 });
 
 // Handle message events for auto TTS in voice channels
@@ -185,14 +189,10 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
         
         if (oldState.channel) {
             const connection = client.connections.get(guildId);
-            if (connection && connection.joinConfig.channelId === oldState.channelId) {
-                const guildUsers = client.voiceUsers.get(guildId);
+            if (connection && connection.joinConfig.channelId === oldState.channelId) {                const guildUsers = client.voiceUsers.get(guildId);
                 if (guildUsers) {
-                    guildUsers.delete(oldState.member.id);
-                }
-                
-                // REMOVED: No longer check if the bot should leave the channel
-                // client.checkAndLeaveEmptyChannel(oldState.channel, guildId);
+                    guildUsers.delete(oldState.member.id);                }
+                  client.checkAndLeaveEmptyChannel(oldState.channel, guildId);
             }
         }
         return;
@@ -240,18 +240,14 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
                 if (!newState.channel) {
                     // Get localized text for user left
                     const leaveMessage = getText('voiceEvents.userLeft', responseLang, [oldState.member.user.username]);
-                    
-                    // Add leave announcement with high priority
+                      // Add leave announcement with high priority
                     enqueueSystemMessage(
                         oldState.guild.id,
                         leaveMessage,
                         client,
                         getServerSettings
-                    );
-                }
-                
-                // REMOVED: No longer check if the bot should leave the channel
-                // client.checkAndLeaveEmptyChannel(oldState.channel, oldState.guild.id);
+                    );                }
+                  client.checkAndLeaveEmptyChannel(oldState.channel, oldState.guild.id);
             }
         }
     }
