@@ -44,17 +44,11 @@ module.exports = {
     settings: {
         current: "**Current Server Settings**\nLanguage: {0}\nUsernames disabled: {1}\nJoin/leave notifications disabled: {2}",
         updated: "Settings have been updated!",
-        needPermission: "You need the 'Manage Server' permission to change settings.",
         language: {
             changed: "Server language has been set to {0}!",
-            invalid: "Invalid language code. Available languages: {0}",
-            updated: "Server language has been set to {0}!"
+            invalid: "Invalid language code. Available languages: {0}"
         },
         joinLeaveMessages: {
-            enabled: "Join/leave notifications have been enabled.",
-            disabled: "Join/leave notifications have been disabled."
-        },
-        joinleave: {
             enabled: "Join/leave notifications have been enabled.",
             disabled: "Join/leave notifications have been disabled."
         },

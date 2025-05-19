@@ -44,17 +44,11 @@ module.exports = {
     settings: {
         current: "**Cài đặt máy chủ hiện tại**\\nNgôn ngữ: {0}\\nTắt tên người dùng: {1}\\nTắt thông báo tham gia/rời đi: {2}",
         updated: "Cài đặt đã được cập nhật!",
-        needPermission: "Bạn cần quyền 'Quản lý Máy chủ' để thay đổi cài đặt.",
         language: {
             changed: "Ngôn ngữ máy chủ đã được đặt thành {0}!",
-            invalid: "Mã ngôn ngữ không hợp lệ. Các ngôn ngữ có sẵn: {0}",
-            updated: "Ngôn ngữ máy chủ đã được đặt thành {0}!"
+            invalid: "Mã ngôn ngữ không hợp lệ. Các ngôn ngữ có sẵn: {0}"
         },
         joinLeaveMessages: {
-            enabled: "Thông báo tham gia/rời đi đã được bật.",
-            disabled: "Thông báo tham gia/rời đi đã bị tắt."
-        },
-        joinleave: {
             enabled: "Thông báo tham gia/rời đi đã được bật.",
             disabled: "Thông báo tham gia/rời đi đã bị tắt."
         },
